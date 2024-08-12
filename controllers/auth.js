@@ -1,4 +1,7 @@
 import User from "../database/models/user.js";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
+import sendEmail from "../utils/sendEmail.js";
 import { OAuth2Client } from "google-auth-library";
 import { generateRandomString } from "../utils/helper.js";
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -164,6 +167,124 @@ export const googlelogin = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Error while logging in user with Google",
+      error: error.message,
+    });
+  }
+};
+
+// Get access token from refresh token
+export const getAccessToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({ message: "Please provide refresh token" });
+    }
+
+    jwt.verify(
+      refreshToken,
+      process.env.REFRESHTOKEN_SECRET_KEY,
+      (err, decoded) => {
+        if (err) {
+          return res.status(401).json({ message: "Invalid refresh token" });
+        }
+
+        const { _id, email } = decoded;
+        const accessToken = jwt.sign({ _id, email }, process.env.JWT_SECRET, {
+          expiresIn: "1d",
+        });
+
+        res.status(200).json({
+          message: "Access token generated successfully",
+          accessToken,
+        });
+      }
+    );
+  } catch (error) {
+    res.status(500).json({
+      message: "Error while generating access token",
+      error: error.message,
+    });
+  }
+};
+
+// Forgot password (send reset code to email)
+export const forgotpassword = async (req, res) => {
+  try {
+    const { purpose } = req.params;
+    const { email } = req.body;
+    if (!email || !purpose) {
+      return res
+        .status(400)
+        .json({ message: "Please provide email and purpose" });
+    }
+
+    const resetCode = Math.floor(100000 + Math.random() * 900000);
+    const existingUser = await User.findOne({ email });
+
+    if (!existingUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    await User.updateOne({ email }, { resetCode });
+
+    const emailSubject = "Reset Password";
+    const emailMessage = `
+      <div>
+        <p>Hello ${existingUser.firstName},</p>
+        <p>Please use this code to reset your password:</p>
+        <h1 style="background:#ddd;width:fit-content;padding:3px 12px;letter-spacing:1px">${resetCode}</h1>
+        <h4>Note: This code will expire in 10 minutes</h4>
+      </div>
+    `;
+
+    const response = await sendEmail(email, emailSubject, emailMessage);
+    if (!response.success) {
+      return res.status(400).json({
+        message: "Error while sending reset code",
+        error: response.error,
+      });
+    }
+
+    res.status(200).json({ message: "Reset code sent successfully" });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error while sending reset code",
+      error: error.message,
+    });
+  }
+};
+
+// Set up new password
+export const setNewPassword = async (req, res) => {
+  try {
+    const { email, resetCode, password } = req.body;
+    if (!email || !resetCode || !password) {
+      return res.status(400).json({
+        message: "Please provide email, reset code, and new password",
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User does not exist" });
+    }
+
+    if (user.resetCode !== resetCode) {
+      return res.status(400).json({ message: "Invalid reset code" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    await User.updateOne(
+      { email },
+      { password: hashedPassword, resetCode: null }
+    );
+
+    res.status(200).json({ message: "Password updated successfully" });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error while updating password",
       error: error.message,
     });
   }
