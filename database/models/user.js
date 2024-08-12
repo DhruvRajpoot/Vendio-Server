@@ -22,6 +22,10 @@ const userSchema = new mongoose.Schema(
     lastName: {
       type: String,
     },
+    profilePic: {
+      type: String,
+      default: null,
+    },
     resetCode: {
       type: Number,
       default: null,
