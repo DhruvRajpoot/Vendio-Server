@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Please enter your email"],
       unique: true,
-      validate: [validator.isEmail, "Please enter valid email address"],
+      validate: [validator.isEmail, "Please enter a valid email address"],
     },
     password: {
       type: String,
@@ -38,38 +38,48 @@ const userSchema = new mongoose.Schema(
 
 // Hash the password before saving the user model
 userSchema.pre("save", async function (next) {
-  try {
-    if (this.isModified("password") || this.isNew) {
+  if (this.isModified("password") || this.isNew) {
+    try {
       const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(this.password, salt);
-      this.password = hashedPassword;
+      this.password = await bcrypt.hash(this.password, salt);
+    } catch (error) {
+      return next(error);
     }
-    return next();
-  } catch (error) {
-    return next(error);
   }
+  next();
 });
 
 // Compare password entered by user with the password in the database
-userSchema.methods.comparePassword = function (password) {
-  return bcrypt.compareSync(password, this.password);
+userSchema.methods.comparePassword = async function (password) {
+  try {
+    return await bcrypt.compare(password, this.password);
+  } catch (error) {
+    throw new Error("Error comparing passwords");
+  }
 };
 
 // Generate an auth token for the user
 userSchema.methods.generateAuthToken = async function () {
   const user = this;
-  const userobj = {
+  const payload = {
     _id: user._id.toString(),
-    username: user.username,
     email: user.email,
   };
-  const accessToken = jwt.sign(userobj, process.env.JWT_SECRET, {
-    expiresIn: "2hr",
-  });
-  const refreshToken = jwt.sign(userobj, process.env.REFRESHTOKEN_SECRET_KEY, {
-    expiresIn: "7d",
-  });
-  return { accessToken, refreshToken };
+  try {
+    const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: "2h",
+    });
+    const refreshToken = jwt.sign(
+      payload,
+      process.env.REFRESHTOKEN_SECRET_KEY,
+      {
+        expiresIn: "7d",
+      }
+    );
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw new Error("Error generating tokens");
+  }
 };
 
 const User = mongoose.model("User", userSchema);
