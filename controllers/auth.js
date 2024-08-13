@@ -2,11 +2,12 @@ import User from "../database/models/user.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import sendEmail from "../utils/sendEmail.js";
+import axios from "axios";
 import { OAuth2Client } from "google-auth-library";
 import { generateRandomString } from "../utils/helper.js";
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Add user (register user)
+// Add user (signup user)
 export const signup = async (req, res) => {
   const { email, password, firstName, lastName } = req.body;
 
@@ -79,20 +80,20 @@ export const login = async (req, res) => {
   }
 };
 
-// Google Register
-export const googleregister = async (req, res) => {
+// Google signup
+export const googlesignup = async (req, res) => {
   try {
     const { googleToken } = req.body;
     if (!googleToken) {
       return res.status(400).json({ message: "Please provide Google token" });
     }
 
-    const ticket = await client.verifyIdToken({
-      idToken: googleToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
+    const userProfile = await axios.get(
+      `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${googleToken}`
+    );
 
-    const { name, email } = ticket.getPayload();
+    const { email, name, picture } = userProfile.data;
+    console.log(userProfile.data);
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -102,7 +103,7 @@ export const googleregister = async (req, res) => {
     const user = new User({
       email,
       firstName: name,
-      profilePic: null,
+      profilePic: picture,
       password: generateRandomString(10),
       isVerified: true,
     });
@@ -139,11 +140,11 @@ export const googlelogin = async (req, res) => {
       return res.status(400).json({ message: "Please provide Google token" });
     }
 
-    const ticket = await client.verifyIdToken({
-      idToken: googleToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-    const { email } = ticket.getPayload();
+    const googleresponse = await axios.get(
+      `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${googleToken}`
+    );
+
+    const { email } = googleresponse.data;
 
     const user = await User.findOne({ email });
     if (!user) {
