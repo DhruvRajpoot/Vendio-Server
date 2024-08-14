@@ -3,9 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import sendEmail from "../utils/sendEmail.js";
 import axios from "axios";
-import { OAuth2Client } from "google-auth-library";
 import { generateRandomString } from "../utils/helper.js";
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Add user (signup user)
 export const signup = async (req, res) => {
@@ -14,7 +12,7 @@ export const signup = async (req, res) => {
   try {
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ error: "User already exists" });
+      return res.status(400).json({ message: "User already exists" });
     }
 
     const user = new User({ email, password, firstName, lastName });
@@ -36,7 +34,10 @@ export const signup = async (req, res) => {
       user: filterUser,
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({
+      message: "Error while adding user",
+      error: error.message,
+    });
   }
 };
 
@@ -53,12 +54,12 @@ export const login = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ error: "Invalid Credentials" });
+      return res.status(404).json({ message: "Invalid Credentials" });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(404).json({ error: "Invalid Credentials" });
+      return res.status(404).json({ message: "Invalid Credentials" });
     }
 
     const token = await user.generateAuthToken();
@@ -76,7 +77,10 @@ export const login = async (req, res) => {
       token,
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({
+      message: "Error while logging in user",
+      error: error.message,
+    });
   }
 };
 
@@ -93,7 +97,6 @@ export const googlesignup = async (req, res) => {
     );
 
     const { email, name, picture } = userProfile.data;
-    console.log(userProfile.data);
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
