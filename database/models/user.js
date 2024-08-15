@@ -21,6 +21,7 @@ const userSchema = new mongoose.Schema(
     },
     lastName: {
       type: String,
+      default: null,
     },
     profilePic: {
       type: String,
@@ -68,6 +69,10 @@ userSchema.methods.generateAuthToken = async function () {
   const payload = {
     _id: user._id.toString(),
     email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    profilePic: user.profilePic,
+    isVerified: user.isVerified,
   };
   try {
     const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {

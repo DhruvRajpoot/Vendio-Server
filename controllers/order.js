@@ -1,0 +1,101 @@
+import Order from "../database/models/order.js";
+import Cart from "../database/models/cart.js";
+
+// Create a new order
+export const createOrder = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { shippingAddress, paymentMethod, discountAmount } = req.body;
+
+    const cart = await Cart.findOne({ userId });
+    if (!cart || cart.items.length === 0) {
+      return res.status(400).json({ message: "Cart is empty or not found." });
+    }
+
+    const finalPrice = cart.totalPrice - discountAmount;
+
+    const order = new Order({
+      userId: userId,
+      items: cart.items,
+      shippingAddress,
+      paymentMethod,
+      discountAmount,
+      totalItems: cart.totalItems,
+      totalPrice: cart.totalPrice,
+      finalPrice,
+    });
+
+    await order.save();
+
+    await Cart.findByIdAndDelete(cart._id);
+
+    res.status(201).json({ message: "Order placed successfully", order });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Failed to place order", error: error.message });
+  }
+};
+
+// Get all orders for a user
+export const getUserOrders = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const orders = await Order.find({
+      userId: userId,
+    }).sort({ createdAt: -1 });
+    res.status(200).json({ orders });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Failed to fetch orders", error: error.message });
+  }
+};
+
+// Update order status (trigged by shipper)
+export const updateOrderStatus = async (req, res) => {
+  try {
+    const { orderId, status } = req.body;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    order.orderStatus = status;
+    if (status === "Delivered") {
+      order.isDelivered = true;
+      order.deliveredAt = new Date();
+    }
+
+    await order.save();
+    res.status(200).json({ message: "Order status updated", order });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Failed to update order status", error: error.message });
+  }
+};
+
+// Update payment status (triggered by payment gateway webhook)
+export const updatePaymentStatus = async (req, res) => {
+  try {
+    const { orderId, status } = req.body;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    order.paymentStatus = status;
+
+    await order.save();
+    res.status(200).json({ message: "Payment status updated", order });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to update payment status",
+      error: error.message,
+    });
+  }
+};
