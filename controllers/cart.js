@@ -25,7 +25,9 @@ export const addToCart = async (req, res) => {
         cart.items[existingItemIndex].quantity += quantity;
         cart.items[existingItemIndex].totalPrice =
           (cart.items[existingItemIndex].product.price -
-            cart.items[existingItemIndex].product.discount) *
+            (cart.items[existingItemIndex].product.discount *
+              cart.items[existingItemIndex].product.price) /
+              100) *
           cart.items[existingItemIndex].quantity;
       } else {
         // Add new item to cart
@@ -43,7 +45,9 @@ export const addToCart = async (req, res) => {
             rating: product.rating,
           },
           quantity,
-          totalPrice: (product.price - product.discount) * quantity,
+          totalPrice:
+            (product.price - (product.discount * product.price) / 100) *
+            quantity,
         });
       }
     } else {
@@ -65,7 +69,9 @@ export const addToCart = async (req, res) => {
               rating: product.rating,
             },
             quantity,
-            totalPrice: (product.price - product.discount) * quantity,
+            totalPrice:
+              (product.price - (product.discount * product.price) / 100) *
+              quantity,
           },
         ],
       });
