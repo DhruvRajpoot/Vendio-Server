@@ -58,10 +58,17 @@ const orderSchema = new mongoose.Schema(
       required: true,
       default: 0,
     },
+    deliveryCharges: {
+      type: Number,
+      required: true,
+    },
+    taxes: {
+      type: Number,
+      required: true,
+    },
     finalPrice: {
       type: Number,
       required: true,
-      default: 0,
     },
     isDelivered: {
       type: Boolean,
@@ -72,21 +79,14 @@ const orderSchema = new mongoose.Schema(
     },
     orderStatus: {
       type: String,
-      enum: ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"],
-      default: "Pending",
+      enum: ["Placed", "Processing", "Shipped", "Delivered", "Cancelled"],
+      default: "Placed",
     },
   },
   {
     timestamps: true,
   }
 );
-
-orderSchema.pre("save", function (next) {
-  this.totalItems = this.items.reduce((acc, item) => acc + item.quantity, 0);
-  this.totalPrice = this.items.reduce((acc, item) => acc + item.totalPrice, 0);
-  this.finalPrice = this.totalPrice - this.discountAmount;
-  next();
-});
 
 const Order = mongoose.model("Order", orderSchema);
 
