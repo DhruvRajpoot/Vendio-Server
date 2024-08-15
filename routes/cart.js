@@ -7,20 +7,20 @@ import {
   clearCart,
   addBulkToCart,
 } from "../controllers/cart.js";
-import checkUser from "../middleware/checkUser.js";
+import checkuser from "../middleware/checkuser.js";
 
 const router = express.Router();
 
-router.post("/", checkUser, addToCart);
+router.post("/", checkuser, addToCart);
 
-router.get("/", checkUser, getCart);
+router.get("/", checkuser, getCart);
 
-router.put("/", checkUser, updateCart);
+router.put("/", checkuser, updateCart);
 
-router.delete("/:productId", checkUser, removeFromCart);
+router.delete("/:productId", checkuser, removeFromCart);
 
-router.delete("/", checkUser, clearCart);
+router.delete("/", checkuser, clearCart);
 
-router.post("/bulk", checkUser, addBulkToCart);
+router.post("/bulk", checkuser, addBulkToCart);
 
 export default router;
