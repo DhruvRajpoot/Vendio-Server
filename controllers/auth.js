@@ -84,8 +84,8 @@ export const login = async (req, res) => {
   }
 };
 
-// Google signup
-export const googlesignup = async (req, res) => {
+// Google Signup & Login
+export const google = async (req, res) => {
   try {
     const { googleToken } = req.body;
     if (!googleToken) {
@@ -99,8 +99,22 @@ export const googlesignup = async (req, res) => {
     const { email, name, picture } = userProfile.data;
 
     const existingUser = await User.findOne({ email });
+
     if (existingUser) {
-      return res.status(409).json({ message: "User already exists" });
+      const token = await existingUser.generateAuthToken();
+      const filterUser = {
+        _id: existingUser._id.toString(),
+        email: existingUser.email,
+        firstName: existingUser.firstName,
+        profilePic: existingUser.profilePic,
+        isVerified: existingUser.isVerified,
+      };
+
+      return res.status(200).json({
+        message: "User logged in successfully",
+        user: filterUser,
+        token,
+      });
     }
 
     const user = new User({
@@ -122,7 +136,7 @@ export const googlesignup = async (req, res) => {
       isVerified: response.isVerified,
     };
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "User added successfully",
       token,
       user: filterUser,
@@ -130,47 +144,6 @@ export const googlesignup = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Error while registering user with Google",
-      error: error.message,
-    });
-  }
-};
-
-// Google Login
-export const googlelogin = async (req, res) => {
-  try {
-    const { googleToken } = req.body;
-    if (!googleToken) {
-      return res.status(400).json({ message: "Please provide Google token" });
-    }
-
-    const googleresponse = await axios.get(
-      `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${googleToken}`
-    );
-
-    const { email } = googleresponse.data;
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: "User does not exist" });
-    }
-
-    const token = await user.generateAuthToken();
-    const filterUser = {
-      _id: user._id.toString(),
-      email: user.email,
-      firstName: user.firstName,
-      profilePic: user.profilePic,
-      isVerified: user.isVerified,
-    };
-
-    res.status(200).json({
-      message: "User logged in successfully",
-      user: filterUser,
-      token,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Error while logging in user with Google",
       error: error.message,
     });
   }
