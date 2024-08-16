@@ -5,15 +5,26 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 
+dotenv.config();
+
 const app = express();
 const port = process.env.PORT || 8080;
 
-dotenv.config();
-app.use(cors());
+// CORS configuration
+const corsOptions = {
+  origin: [process.env.CLIENT_URL],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+
 app.use(express.json());
 app.use(bodyParser.json({ extended: true }));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
+
 connectdatabase();
 
 // Routes
