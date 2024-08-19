@@ -4,6 +4,8 @@ import bcrypt from "bcrypt";
 import sendEmail from "../utils/sendEmail.js";
 import axios from "axios";
 import { generateRandomString } from "../utils/helper.js";
+import welcome from "../templates/welcomeEmail.js";
+import welcomeEmail from "../templates/welcomeEmail.js";
 
 // Add user (signup user)
 export const signup = async (req, res) => {
@@ -27,6 +29,11 @@ export const signup = async (req, res) => {
       lastName: response.lastName,
       isVerified: response.isVerified,
     };
+
+    // Send welcome email
+    const emailSubject = `🚀 Welcome to Vendio, ${filterUser.firstName}! Your Account is Ready 🌟`;
+    const emailMessage = welcomeEmail(filterUser);
+    await sendEmail(email, emailSubject, emailMessage);
 
     res.status(201).json({
       message: "User added successfully",
@@ -135,6 +142,11 @@ export const google = async (req, res) => {
       profilePic: response.profilePic,
       isVerified: response.isVerified,
     };
+
+    // Send welcome email
+    const emailSubject = `🚀 Welcome to Vendio, ${filterUser.firstName}! Your Account is Ready 🌟`;
+    const emailMessage = welcomeEmail(filterUser);
+    await sendEmail(email, emailSubject, emailMessage);
 
     return res.status(201).json({
       message: "User added successfully",
