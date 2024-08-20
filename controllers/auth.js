@@ -4,8 +4,9 @@ import bcrypt from "bcrypt";
 import sendEmail from "../utils/sendEmail.js";
 import axios from "axios";
 import { generateRandomString } from "../utils/helper.js";
-import welcome from "../templates/welcomeEmail.js";
 import welcomeEmail from "../templates/welcomeEmail.js";
+import verifyEmailTemplate from "../templates/verifyEmail.js";
+import Token from "../database/models/token.js";
 
 // Add user (signup user)
 export const signup = async (req, res) => {
@@ -19,30 +20,80 @@ export const signup = async (req, res) => {
 
     const user = new User({ email, password, firstName, lastName });
 
-    const response = await user.save();
-    const token = await response.generateAuthToken();
+    await user.save();
 
-    const filterUser = {
-      _id: response._id.toString(),
-      email: response.email,
-      firstName: response.firstName,
-      lastName: response.lastName,
-      isVerified: response.isVerified,
-    };
+    const verificationToken = crypto.randomUUID();
 
-    // Send welcome email
-    const emailSubject = `🚀 Welcome to Vendio, ${filterUser.firstName}! Your Account is Ready 🌟`;
-    const emailMessage = welcomeEmail(filterUser);
+    const token = new Token({
+      token: verificationToken,
+      user: user._id,
+    });
+
+    await token.save();
+
+    // Send verification email
+    const emailSubject = "Verify Your Email";
+    const emailMessage = verifyEmailTemplate(user, verificationToken);
     await sendEmail(email, emailSubject, emailMessage);
 
-    res.status(201).json({
-      message: "User added successfully",
-      token,
-      user: filterUser,
+    res.status(200).json({
+      message: "Verification email sent successfully",
     });
   } catch (error) {
     res.status(400).json({
       message: "Error while adding user",
+      error: error.message,
+    });
+  }
+};
+
+// Verify email
+export const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: "Invalid token" });
+    }
+
+    const existingToken = await Token.findOne({ token });
+
+    if (!existingToken) {
+      return res.status(400).json({ message: "Invalid token" });
+    }
+
+    const user = await User.findOne({ _id: existingToken.user });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "User already verified" });
+    }
+
+    user.isVerified = true;
+    await user.save();
+    await Token.findByIdAndDelete(existingToken._id);
+
+    const authtoken = await user.generateAuthToken();
+
+    const filterUser = {
+      _id: user._id.toString(),
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      isVerified: user.isVerified,
+    };
+
+    res.status(200).json({
+      message: "Email verified successfully",
+      user: filterUser,
+      token: authtoken,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error while verifying email",
       error: error.message,
     });
   }

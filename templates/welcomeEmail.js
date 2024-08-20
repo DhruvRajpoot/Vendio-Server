@@ -94,11 +94,7 @@ const welcomeEmail = (user) => {
                         </p>
                         <p>
                             Browse our extensive range of products, create wishlists, and take advantage of exclusive deals and offers.
-                        </p>
-                        <p>
-                            If you have any questions or need support, don't hesitate to reach out to us at 
-                            <a href="mailto:dhruvrajpootiiitbhopal@gmail.com">dhruvrajpootiiitbhopal@gmail.com</a>.
-                        </p>
+                        </p>                        
                         <p>
                             Thank you for joining Vendio. We hope you have an amazing shopping experience!
                         </p>
