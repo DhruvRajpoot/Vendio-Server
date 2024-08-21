@@ -22,6 +22,22 @@ export const signup = async (req, res) => {
 
     await user.save();
 
+    await sendVerificationEmail(user);
+
+    res.status(200).json({
+      message: "Verification email sent successfully",
+    });
+  } catch (error) {
+    res.status(400).json({
+      message: "Error while adding user",
+      error: error.message,
+    });
+  }
+};
+
+// Send Verification Email
+export const sendVerificationEmail = async (user) => {
+  try {
     const verificationToken = crypto.randomUUID();
 
     const token = new Token({
@@ -34,16 +50,9 @@ export const signup = async (req, res) => {
     // Send verification email
     const emailSubject = "Verify Your Email";
     const emailMessage = verifyEmailTemplate(user, verificationToken);
-    await sendEmail(email, emailSubject, emailMessage);
-
-    res.status(200).json({
-      message: "Verification email sent successfully",
-    });
+    await sendEmail(user.email, emailSubject, emailMessage);
   } catch (error) {
-    res.status(400).json({
-      message: "Error while adding user",
-      error: error.message,
-    });
+    throw new Error("Error while sending verification email");
   }
 };
 
@@ -111,16 +120,26 @@ export const login = async (req, res) => {
     }
 
     const user = await User.findOne({ email });
+
     if (!user) {
       return res.status(404).json({ message: "Invalid Credentials" });
     }
 
     const isMatch = await user.comparePassword(password);
+
     if (!isMatch) {
       return res.status(404).json({ message: "Invalid Credentials" });
     }
 
+    if (!user.isVerified) {
+      await sendVerificationEmail(user);
+      return res
+        .status(403)
+        .json({ message: "Please verify your email to login" });
+    }
+
     const token = await user.generateAuthToken();
+
     const filterUser = {
       _id: user._id.toString(),
       email: user.email,
