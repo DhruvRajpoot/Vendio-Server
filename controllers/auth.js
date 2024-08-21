@@ -56,6 +56,38 @@ export const sendVerificationEmail = async (user) => {
   }
 };
 
+// Resend verification email
+export const resendVerificationEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Please provide email" });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "User already verified" });
+    }
+
+    await sendVerificationEmail(user);
+
+    res.status(200).json({
+      message: "Verification email sent successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error while resending verification email",
+      error: error.message,
+    });
+  }
+};
+
 // Verify email
 export const verifyEmail = async (req, res) => {
   try {
@@ -125,17 +157,17 @@ export const login = async (req, res) => {
       return res.status(404).json({ message: "Invalid Credentials" });
     }
 
-    const isMatch = await user.comparePassword(password);
-
-    if (!isMatch) {
-      return res.status(404).json({ message: "Invalid Credentials" });
-    }
-
     if (!user.isVerified) {
       await sendVerificationEmail(user);
       return res
         .status(403)
         .json({ message: "Please verify your email to login" });
+    }
+
+    const isMatch = await user.comparePassword(password);
+
+    if (!isMatch) {
+      return res.status(404).json({ message: "Invalid Credentials" });
     }
 
     const token = await user.generateAuthToken();
