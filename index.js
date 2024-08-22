@@ -12,7 +12,7 @@ const port = process.env.PORT || 8080;
 
 // CORS configuration
 const corsOptions = {
-  origin: [process.env.CLIENT_URL],
+  origin: [clientUrl],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -32,6 +32,7 @@ import authRoutes from "./routes/auth.js";
 import cartRoutes from "./routes/cart.js";
 import orderRoutes from "./routes/order.js";
 import wishlistRoutes from "./routes/wishlist.js";
+import { clientUrl } from "./config/baseurl.js";
 
 app.use("/api/auth", authRoutes);
 app.use("/api/cart", cartRoutes);

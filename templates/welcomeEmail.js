@@ -1,3 +1,5 @@
+import { contactEmail, clientUrl } from "../config/baseurl.js";
+
 const welcomeEmail = (user) => {
   return `
         <!DOCTYPE html>
@@ -98,12 +100,12 @@ const welcomeEmail = (user) => {
                         <p>
                             Thank you for joining Vendio. We hope you have an amazing shopping experience!
                         </p>
-                        <a href=${`${process.env.CLIENT_URL}/products`} class="cta-button">Start Shopping Now</a>
+                        <a href=${`${clientUrl}/products`} class="cta-button">Start Shopping Now</a>
                     </div>
                 </div>
                 <div class="footer">
                     <p>&copy; 2024 Vendio. All rights reserved.</p>
-                    <p>If you did not create this account, please <a href="mailto:dhruvrajpootiiitbhopal@gmail.com">contact us</a> immediately.</p>
+                    <p>If you did not create this account, please <a href="mailto:${contactEmail}">contact us</a> immediately.</p>
                 </div>
             </div>
         </body>

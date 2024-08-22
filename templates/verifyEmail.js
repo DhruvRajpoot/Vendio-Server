@@ -1,3 +1,5 @@
+import { clientUrl, contactEmail } from "../config/baseurl.js";
+
 const verifyEmail = (user, token) => {
   return `
           <!DOCTYPE html>
@@ -95,12 +97,12 @@ const verifyEmail = (user, token) => {
                           <p>
                               Simply click the button below to verify your email:
                           </p>
-                          <a href="${process.env.CLIENT_URL}/verify-email?token=${token}" class="cta-button">Verify Your Email</a>
+                          <a href="${clientUrl}/verify-email?token=${token}" class="cta-button">Verify Your Email</a>
                       </div>
                   </div>
                   <div class="footer">
                     <p>&copy; 2024 Vendio. All rights reserved.</p>
-                    <p>If you did not create this account, please <a href="mailto:dhruvrajpootiiitbhopal@gmail.com">contact us</a> immediately.</p>
+                    <p>If you did not create this account, please <a href="mailto:${contactEmail}">contact us</a> immediately.</p>
                 </div>
               </div>
           </body>
