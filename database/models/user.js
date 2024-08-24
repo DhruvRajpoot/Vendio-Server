@@ -27,10 +27,6 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
-    resetCode: {
-      type: Number,
-      default: null,
-    },
     isVerified: {
       type: Boolean,
       default: false,

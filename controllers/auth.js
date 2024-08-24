@@ -7,6 +7,7 @@ import { generateRandomString } from "../utils/helper.js";
 import welcomeEmail from "../templates/welcomeEmail.js";
 import verifyEmailTemplate from "../templates/verifyEmail.js";
 import Token from "../database/models/token.js";
+import passwordResetEmail from "../templates/passwordResetEmail.js";
 
 // Add user (signup user)
 export const signup = async (req, res) => {
@@ -43,6 +44,7 @@ export const sendVerificationEmail = async (user) => {
     const token = new Token({
       token: verificationToken,
       user: user._id,
+      type: "emailverification",
     });
 
     await token.save();
@@ -97,7 +99,10 @@ export const verifyEmail = async (req, res) => {
       return res.status(400).json({ message: "Invalid token" });
     }
 
-    const existingToken = await Token.findOne({ token });
+    const existingToken = await Token.findOne({
+      token,
+      type: "emailverification",
+    });
 
     if (!existingToken) {
       return res.status(400).json({ message: "Invalid token" });
@@ -311,79 +316,80 @@ export const getAccessToken = async (req, res) => {
   }
 };
 
-// Forgot password (send reset code to email)
+// Send Password Reset Email
+export const sendPasswordResetEmail = async (user) => {
+  try {
+    const passwordResetToken = crypto.randomUUID();
+
+    const token = new Token({
+      token: passwordResetToken,
+      user: user._id,
+      type: "passwordreset",
+    });
+
+    await token.save();
+
+    // Send password reset email
+    const emailSubject = "Reset Your Password";
+    const emailMessage = passwordResetEmail(user, passwordResetToken);
+    await sendEmail(user.email, emailSubject, emailMessage);
+  } catch (error) {
+    throw new Error("Error while sending password reset email");
+  }
+};
+
+// Forgot password
 export const forgotpassword = async (req, res) => {
   try {
-    const { purpose } = req.params;
     const { email } = req.body;
-    if (!email || !purpose) {
-      return res
-        .status(400)
-        .json({ message: "Please provide email and purpose" });
+
+    if (!email) {
+      return res.status(400).json({ message: "Please provide email" });
     }
 
-    const resetCode = Math.floor(100000 + Math.random() * 900000);
     const existingUser = await User.findOne({ email });
 
     if (!existingUser) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    await User.updateOne({ email }, { resetCode });
+    await sendPasswordResetEmail(existingUser);
 
-    const emailSubject = "Reset Password";
-    const emailMessage = `
-      <div>
-        <p>Hello ${existingUser.firstName},</p>
-        <p>Please use this code to reset your password:</p>
-        <h1 style="background:#ddd;width:fit-content;padding:3px 12px;letter-spacing:1px">${resetCode}</h1>
-        <h4>Note: This code will expire in 10 minutes</h4>
-      </div>
-    `;
-
-    const response = await sendEmail(email, emailSubject, emailMessage);
-    if (!response.success) {
-      return res.status(400).json({
-        message: "Error while sending reset code",
-        error: response.error,
-      });
-    }
-
-    res.status(200).json({ message: "Reset code sent successfully" });
+    res.status(200).json({
+      message: "Password reset link sent to your email.",
+    });
   } catch (error) {
     res.status(500).json({
-      message: "Error while sending reset code",
+      message: "Error sending password reset link",
       error: error.message,
     });
   }
 };
 
-// Set up new password
+// Set new password
 export const setNewPassword = async (req, res) => {
   try {
-    const { email, resetCode, password } = req.body;
-    if (!email || !resetCode || !password) {
+    const { password, token } = req.body;
+    if (!password || !token) {
       return res.status(400).json({
-        message: "Please provide email, reset code, and new password",
+        message: "Please provide new password and token",
       });
     }
 
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: "User does not exist" });
-    }
+    const existingToken = await Token.findOne({ token, type: "passwordreset" });
 
-    if (user.resetCode !== resetCode) {
-      return res.status(400).json({ message: "Invalid reset code" });
+    if (!existingToken) {
+      return res.status(400).json({ message: "Invalid token" });
     }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    await User.updateOne(
-      { email },
-      { password: hashedPassword, resetCode: null }
-    );
+    await User.findByIdAndUpdate(existingToken.user._id, {
+      password: hashedPassword,
+    });
+
+    await Token.findByIdAndDelete(existingToken._id);
 
     res.status(200).json({ message: "Password updated successfully" });
   } catch (error) {

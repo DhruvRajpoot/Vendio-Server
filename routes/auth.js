@@ -18,7 +18,7 @@ router.post("/resend-verification-email", resendVerificationEmail);
 router.post("/login", login);
 router.post("/google", google);
 router.post("/getaccesstoken", getAccessToken);
-router.post("/forgotpassword", forgotpassword);
+router.post("/forgot-password", forgotpassword);
 router.post("/setnewpassword", setNewPassword);
 
 export default router;
