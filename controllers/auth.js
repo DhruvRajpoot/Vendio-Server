@@ -132,6 +132,11 @@ export const verifyEmail = async (req, res) => {
       isVerified: user.isVerified,
     };
 
+    // Send welcome email
+    const emailSubject = `🚀 Welcome to Vendio, ${filterUser.firstName}! Your Account is Ready 🌟`;
+    const emailMessage = welcomeEmail(filterUser);
+    await sendEmail(filterUser.email, emailSubject, emailMessage);
+
     res.status(200).json({
       message: "Email verified successfully",
       user: filterUser,
