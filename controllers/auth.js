@@ -129,6 +129,7 @@ export const verifyEmail = async (req, res) => {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      profilePic: user.profilePic,
       isVerified: user.isVerified,
     };
 
@@ -187,6 +188,7 @@ export const login = async (req, res) => {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      profilePic: user.profilePic,
       isVerified: user.isVerified,
     };
 
@@ -225,6 +227,7 @@ export const google = async (req, res) => {
         _id: existingUser._id.toString(),
         email: existingUser.email,
         firstName: existingUser.firstName,
+        lastName: existingUser.lastName,
         profilePic: existingUser.profilePic,
         isVerified: existingUser.isVerified,
       };
@@ -251,6 +254,7 @@ export const google = async (req, res) => {
       _id: response._id.toString(),
       email: response.email,
       firstName: response.firstName,
+      lastName: response.lastName,
       profilePic: response.profilePic,
       isVerified: response.isVerified,
     };

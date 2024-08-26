@@ -7,7 +7,7 @@ const checkuser = async (req, res, next) => {
     return res.status(401).json({ message: "You must be logged in" });
   }
   const token = authorization.replace("Bearer ", "");
-  
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const { _id, exp } = decoded;
@@ -21,7 +21,9 @@ const checkuser = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    return res.status(401).json({ message: "You must be logged in" });
+    return res
+      .status(401)
+      .json({ message: error.message || "You must be logged in" });
   }
 };
 
