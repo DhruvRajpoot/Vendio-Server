@@ -4,6 +4,10 @@ import bcrypt from "bcrypt";
 import sendEmail from "../utils/sendEmail.js";
 import axios from "axios";
 import { generateRandomString } from "../utils/helper.js";
+import welcomeEmail from "../templates/welcomeEmail.js";
+import verifyEmailTemplate from "../templates/verifyEmail.js";
+import Token from "../database/models/token.js";
+import passwordResetEmail from "../templates/passwordResetEmail.js";
 
 // Add user (signup user)
 export const signup = async (req, res) => {
@@ -17,25 +21,131 @@ export const signup = async (req, res) => {
 
     const user = new User({ email, password, firstName, lastName });
 
-    const response = await user.save();
-    const token = await response.generateAuthToken();
+    await user.save();
 
-    const filterUser = {
-      _id: response._id.toString(),
-      email: response.email,
-      firstName: response.firstName,
-      lastName: response.lastName,
-      isVerified: response.isVerified,
-    };
+    await sendVerificationEmail(user);
 
-    res.status(201).json({
-      message: "User added successfully",
-      token,
-      user: filterUser,
+    res.status(200).json({
+      message: "Verification email sent successfully",
     });
   } catch (error) {
     res.status(400).json({
       message: "Error while adding user",
+      error: error.message,
+    });
+  }
+};
+
+// Send Verification Email
+export const sendVerificationEmail = async (user) => {
+  try {
+    const verificationToken = crypto.randomUUID();
+
+    const token = new Token({
+      token: verificationToken,
+      user: user._id,
+      type: "emailverification",
+    });
+
+    await token.save();
+
+    // Send verification email
+    const emailSubject = "Verify Your Email";
+    const emailMessage = verifyEmailTemplate(user, verificationToken);
+    await sendEmail(user.email, emailSubject, emailMessage);
+  } catch (error) {
+    throw new Error("Error while sending verification email");
+  }
+};
+
+// Resend verification email
+export const resendVerificationEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Please provide email" });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "User already verified" });
+    }
+
+    await sendVerificationEmail(user);
+
+    res.status(200).json({
+      message: "Verification email sent successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error while resending verification email",
+      error: error.message,
+    });
+  }
+};
+
+// Verify email
+export const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: "Invalid token" });
+    }
+
+    const existingToken = await Token.findOne({
+      token,
+      type: "emailverification",
+    });
+
+    if (!existingToken) {
+      return res.status(400).json({ message: "Invalid token" });
+    }
+
+    const user = await User.findOne({ _id: existingToken.user });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "User already verified" });
+    }
+
+    user.isVerified = true;
+    await user.save();
+    await Token.findByIdAndDelete(existingToken._id);
+
+    const authtoken = await user.generateAuthToken();
+
+    const filterUser = {
+      _id: user._id.toString(),
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      profilePic: user.profilePic,
+      isVerified: user.isVerified,
+    };
+
+    // Send welcome email
+    const emailSubject = `🚀 Welcome to Vendio, ${filterUser.firstName}! Your Account is Ready 🌟`;
+    const emailMessage = welcomeEmail(filterUser);
+    await sendEmail(filterUser.email, emailSubject, emailMessage);
+
+    res.status(200).json({
+      message: "Email verified successfully",
+      user: filterUser,
+      token: authtoken,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error while verifying email",
       error: error.message,
     });
   }
@@ -53,21 +163,32 @@ export const login = async (req, res) => {
     }
 
     const user = await User.findOne({ email });
+
     if (!user) {
       return res.status(404).json({ message: "Invalid Credentials" });
     }
 
+    if (!user.isVerified) {
+      await sendVerificationEmail(user);
+      return res
+        .status(403)
+        .json({ message: "Please verify your email to login" });
+    }
+
     const isMatch = await user.comparePassword(password);
+
     if (!isMatch) {
       return res.status(404).json({ message: "Invalid Credentials" });
     }
 
     const token = await user.generateAuthToken();
+
     const filterUser = {
       _id: user._id.toString(),
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      profilePic: user.profilePic,
       isVerified: user.isVerified,
     };
 
@@ -106,6 +227,7 @@ export const google = async (req, res) => {
         _id: existingUser._id.toString(),
         email: existingUser.email,
         firstName: existingUser.firstName,
+        lastName: existingUser.lastName,
         profilePic: existingUser.profilePic,
         isVerified: existingUser.isVerified,
       };
@@ -132,9 +254,15 @@ export const google = async (req, res) => {
       _id: response._id.toString(),
       email: response.email,
       firstName: response.firstName,
+      lastName: response.lastName,
       profilePic: response.profilePic,
       isVerified: response.isVerified,
     };
+
+    // Send welcome email
+    const emailSubject = `🚀 Welcome to Vendio, ${filterUser.firstName}! Your Account is Ready 🌟`;
+    const emailMessage = welcomeEmail(filterUser);
+    await sendEmail(email, emailSubject, emailMessage);
 
     return res.status(201).json({
       message: "User added successfully",
@@ -197,79 +325,80 @@ export const getAccessToken = async (req, res) => {
   }
 };
 
-// Forgot password (send reset code to email)
+// Send Password Reset Email
+export const sendPasswordResetEmail = async (user) => {
+  try {
+    const passwordResetToken = crypto.randomUUID();
+
+    const token = new Token({
+      token: passwordResetToken,
+      user: user._id,
+      type: "passwordreset",
+    });
+
+    await token.save();
+
+    // Send password reset email
+    const emailSubject = "Reset Your Password";
+    const emailMessage = passwordResetEmail(user, passwordResetToken);
+    await sendEmail(user.email, emailSubject, emailMessage);
+  } catch (error) {
+    throw new Error("Error while sending password reset email");
+  }
+};
+
+// Forgot password
 export const forgotpassword = async (req, res) => {
   try {
-    const { purpose } = req.params;
     const { email } = req.body;
-    if (!email || !purpose) {
-      return res
-        .status(400)
-        .json({ message: "Please provide email and purpose" });
+
+    if (!email) {
+      return res.status(400).json({ message: "Please provide email" });
     }
 
-    const resetCode = Math.floor(100000 + Math.random() * 900000);
     const existingUser = await User.findOne({ email });
 
     if (!existingUser) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    await User.updateOne({ email }, { resetCode });
+    await sendPasswordResetEmail(existingUser);
 
-    const emailSubject = "Reset Password";
-    const emailMessage = `
-      <div>
-        <p>Hello ${existingUser.firstName},</p>
-        <p>Please use this code to reset your password:</p>
-        <h1 style="background:#ddd;width:fit-content;padding:3px 12px;letter-spacing:1px">${resetCode}</h1>
-        <h4>Note: This code will expire in 10 minutes</h4>
-      </div>
-    `;
-
-    const response = await sendEmail(email, emailSubject, emailMessage);
-    if (!response.success) {
-      return res.status(400).json({
-        message: "Error while sending reset code",
-        error: response.error,
-      });
-    }
-
-    res.status(200).json({ message: "Reset code sent successfully" });
+    res.status(200).json({
+      message: "Password reset link sent to your email.",
+    });
   } catch (error) {
     res.status(500).json({
-      message: "Error while sending reset code",
+      message: "Error sending password reset link",
       error: error.message,
     });
   }
 };
 
-// Set up new password
+// Set new password
 export const setNewPassword = async (req, res) => {
   try {
-    const { email, resetCode, password } = req.body;
-    if (!email || !resetCode || !password) {
+    const { password, token } = req.body;
+    if (!password || !token) {
       return res.status(400).json({
-        message: "Please provide email, reset code, and new password",
+        message: "Please provide new password and token",
       });
     }
 
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: "User does not exist" });
-    }
+    const existingToken = await Token.findOne({ token, type: "passwordreset" });
 
-    if (user.resetCode !== resetCode) {
-      return res.status(400).json({ message: "Invalid reset code" });
+    if (!existingToken) {
+      return res.status(400).json({ message: "Invalid token" });
     }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    await User.updateOne(
-      { email },
-      { password: hashedPassword, resetCode: null }
-    );
+    await User.findByIdAndUpdate(existingToken.user._id, {
+      password: hashedPassword,
+    });
+
+    await Token.findByIdAndDelete(existingToken._id);
 
     res.status(200).json({ message: "Password updated successfully" });
   } catch (error) {
