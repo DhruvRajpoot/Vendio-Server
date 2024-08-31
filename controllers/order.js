@@ -38,10 +38,12 @@ export const createOrder = async (req, res) => {
       totalItems: cart.totalItems,
       totalPrice: cart.totalPrice,
       finalPrice,
+      orderStatus: paymentMethod === "cod" ? "Placed" : "Pending",
     });
 
     await order.save();
-    await Cart.findByIdAndDelete(cart._id);
+
+    if (paymentMethod === "cod") await Cart.findByIdAndDelete(cart._id);
 
     res.status(201).json({ message: "Order placed successfully", order });
   } catch (error) {
@@ -65,7 +67,7 @@ export const getUserOrders = async (req, res) => {
   }
 };
 
-// Update order status (trigged by shipper)
+// Update order status (triggered by shipper)
 export const updateOrderStatus = async (req, res) => {
   try {
     const { orderId, status } = req.body;
@@ -87,27 +89,5 @@ export const updateOrderStatus = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to update order status", error: error.message });
-  }
-};
-
-// Update payment status (triggered by payment gateway webhook)
-export const updatePaymentStatus = async (req, res) => {
-  try {
-    const { orderId, status } = req.body;
-
-    const order = await Order.findById(orderId);
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    order.paymentStatus = status;
-
-    await order.save();
-    res.status(200).json({ message: "Payment status updated", order });
-  } catch (error) {
-    res.status(500).json({
-      message: "Failed to update payment status",
-      error: error.message,
-    });
   }
 };
