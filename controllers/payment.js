@@ -3,6 +3,7 @@ import crypto from "crypto";
 import Payment from "../database/models/payment.js";
 import Order from "../database/models/order.js";
 import Cart from "../database/models/cart.js";
+import mongoose from "mongoose";
 
 // Initialize Razorpay instance
 const razorpayInstance = new Razorpay({
@@ -40,8 +41,7 @@ export const createPayment = async (req, res) => {
 
     await payment.save();
 
-    // Update Order with Razorpay Order ID
-    order.razorpayPaymentId = razorpayOrder.id;
+    order.paymentId = payment._id;
     await order.save();
 
     res.status(200).json({
@@ -56,62 +56,72 @@ export const createPayment = async (req, res) => {
   }
 };
 
+// Verify Payment
 export const verifyPayment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const { razorpayOrderId, razorpayPaymentId, razorpaySignature, orderId } =
       req.body;
 
-    const payment = await Payment.findOne({
-      razorpayOrderId,
-      orderId,
-    });
+    const payment = await Payment.findOne({ razorpayOrderId, orderId }).session(
+      session
+    );
 
     if (!payment) {
+      await session.abortTransaction();
       return res.status(404).json({ message: "Payment record not found" });
     }
 
-    // Verify Signature
+    if (payment.paymentStatus === "Paid") {
+      await session.commitTransaction();
+      return res.status(200).json({ message: "Payment already processed" });
+    }
+
     const shasum = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET);
     shasum.update(`${razorpayOrderId}|${razorpayPaymentId}`);
     const digest = shasum.digest("hex");
 
     if (digest !== razorpaySignature) {
       payment.paymentStatus = "Failed";
-      await payment.save();
+      await payment.save({ session });
 
-      const order = await Order.findById(orderId);
+      const order = await Order.findById(orderId).session(session);
       if (order) {
-        order.paymentStatus = "Failed";
-        await order.save();
+        order.orderStatus = "Cancelled";
+        await order.save({ session });
       }
 
+      await session.commitTransaction();
       return res.status(400).json({ message: "Invalid signature" });
     }
 
-    // Update Payment Status to Paid
     payment.paymentStatus = "Paid";
     payment.razorpayPaymentId = razorpayPaymentId;
-    await payment.save();
+    payment.razorpaySignature = razorpaySignature;
+    await payment.save({ session });
 
-    // Update Order Status to Placed
-    const order = await Order.findById(orderId);
+    const order = await Order.findById(orderId).session(session);
     if (order) {
-      order.paymentStatus = "Paid";
       order.orderStatus = "Placed";
-      order.razorpayPaymentId = razorpayPaymentId;
-      await order.save();
+      await order.save({ session });
 
-      const cart = await Cart.findOne({ userId: order.userId });
+      const cart = await Cart.findOne({ userId: order.userId }).session(
+        session
+      );
       if (cart) {
-        await Cart.findByIdAndDelete(cart._id);
+        await Cart.findByIdAndDelete(cart._id).session(session);
       }
     }
 
+    await session.commitTransaction();
     res.status(200).json({ message: "Payment verified and successful" });
   } catch (error) {
-    console.error("Error verifying payment:", error);
+    await session.abortTransaction();
     res
       .status(500)
       .json({ message: "Payment verification failed", error: error.message });
+  } finally {
+    session.endSession();
   }
 };

@@ -1,4 +1,5 @@
 import Order from "../database/models/order.js";
+import Payment from "../database/models/payment.js";
 import Cart from "../database/models/cart.js";
 import {
   deliveryCharges,
@@ -43,7 +44,23 @@ export const createOrder = async (req, res) => {
 
     await order.save();
 
-    if (paymentMethod === "cod") await Cart.findByIdAndDelete(cart._id);
+    // Handle Payment if Razorpay is used
+    if (paymentMethod === "razorpay") {
+      const payment = new Payment({
+        orderId: order._id,
+        paymentMethod,
+        paymentStatus: "Pending",
+        amount: finalPrice,
+      });
+      await payment.save();
+
+      order.paymentId = payment._id;
+      await order.save();
+    }
+
+    if (paymentMethod === "cod") {
+      await Cart.findByIdAndDelete(cart._id);
+    }
 
     res.status(201).json({ message: "Order placed successfully", order });
   } catch (error) {
@@ -58,7 +75,10 @@ export const getUserOrders = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const orders = await Order.find({ userId }).sort({ createdAt: -1 });
+    const orders = await Order.find({ userId })
+      .populate("paymentId") // Populate payment details if available
+      .sort({ createdAt: -1 });
+
     res.status(200).json({ orders });
   } catch (error) {
     res
