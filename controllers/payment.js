@@ -125,3 +125,25 @@ export const verifyPayment = async (req, res) => {
     session.endSession();
   }
 };
+
+// Process Refund
+export const processRefund = async (paymentId, session) => {
+  try {
+    const payment = await Payment.findById(paymentId).session(session);
+
+    if (!payment || payment.paymentStatus !== "Paid") {
+      return { error: "Payment not found or not eligible for refund" };
+    }
+
+    await razorpayInstance.payments.refund(payment.razorpayPaymentId, {
+      amount: payment.amount,
+    });
+
+    payment.paymentStatus = "Refunded";
+    await payment.save({ session });
+
+    return { success: true };
+  } catch (error) {
+    return { error: error.message || "Failed to process refund" };
+  }
+};

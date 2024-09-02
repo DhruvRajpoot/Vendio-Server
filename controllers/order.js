@@ -6,6 +6,8 @@ import {
   taxRate,
   couponCodes,
 } from "../constants/constants.js";
+import { processRefund } from "./payment.js";
+import mongoose from "mongoose";
 
 // Create a new order
 export const createOrder = async (req, res) => {
@@ -76,7 +78,7 @@ export const getUserOrders = async (req, res) => {
     const userId = req.user._id;
 
     const orders = await Order.find({ userId })
-      .populate("paymentId") // Populate payment details if available
+      .populate("paymentId")
       .sort({ createdAt: -1 });
 
     res.status(200).json({ orders });
@@ -84,6 +86,55 @@ export const getUserOrders = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to fetch orders", error: error.message });
+  }
+};
+
+// Cancel an order
+export const cancelOrder = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { orderId } = req.body;
+
+    const order = await Order.findById(orderId).session(session);
+
+    if (!order) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    if (order.orderStatus === "Cancelled") {
+      await session.commitTransaction();
+      return res.status(400).json({ message: "Order is already cancelled" });
+    }
+
+    order.orderStatus = "Cancelled";
+    await order.save({ session });
+
+    if (order.paymentMethod === "razorpay" && order.paymentId) {
+      const refundResult = await processRefund(order.paymentId, session);
+      if (refundResult.success) {
+        order.isRefunded = true;
+        await order.save({ session });
+      } else {
+        await session.abortTransaction();
+        return res.status(500).json({ message: refundResult.error });
+      }
+    }
+
+    await session.commitTransaction();
+
+    await order.populate("paymentId");
+
+    res.status(200).json({ message: "Order cancelled successfully", order });
+  } catch (error) {
+    await session.abortTransaction();
+    res
+      .status(500)
+      .json({ message: "Failed to cancel order", error: error.message });
+  } finally {
+    session.endSession();
   }
 };
 
