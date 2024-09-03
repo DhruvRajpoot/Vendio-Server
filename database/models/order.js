@@ -40,10 +40,9 @@ const orderSchema = new mongoose.Schema(
       enum: ["razorpay", "cod"],
       required: true,
     },
-    paymentStatus: {
-      type: String,
-      enum: ["Pending", "Paid", "Failed"],
-      default: "Pending",
+    paymentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Payment",
     },
     discountAmount: {
       type: Number,
@@ -79,8 +78,8 @@ const orderSchema = new mongoose.Schema(
     },
     orderStatus: {
       type: String,
-      enum: ["Placed", "Processing", "Shipped", "Delivered", "Cancelled"],
-      default: "Placed",
+      enum: ["Pending", "Placed", "Shipped", "Delivered", "Cancelled"],
+      default: "Pending",
     },
   },
   {

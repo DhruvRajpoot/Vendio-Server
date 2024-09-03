@@ -34,12 +34,14 @@ import cartRoutes from "./routes/cart.js";
 import orderRoutes from "./routes/order.js";
 import wishlistRoutes from "./routes/wishlist.js";
 import addressRoutes from "./routes/address.js";
+import paymentRoutes from "./routes/payment.js";
 
 app.use("/api/auth", authRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/order", orderRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/address", addressRoutes);
+app.use("/api/payment", paymentRoutes);
 
 app.listen(port, () => {
   console.log(`listening at port ${port}`);

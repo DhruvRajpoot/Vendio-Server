@@ -1,10 +1,13 @@
 import Order from "../database/models/order.js";
+import Payment from "../database/models/payment.js";
 import Cart from "../database/models/cart.js";
 import {
   deliveryCharges,
   taxRate,
   couponCodes,
 } from "../constants/constants.js";
+import { processRefund } from "./payment.js";
+import mongoose from "mongoose";
 
 // Create a new order
 export const createOrder = async (req, res) => {
@@ -38,10 +41,28 @@ export const createOrder = async (req, res) => {
       totalItems: cart.totalItems,
       totalPrice: cart.totalPrice,
       finalPrice,
+      orderStatus: paymentMethod === "cod" ? "Placed" : "Pending",
     });
 
     await order.save();
-    await Cart.findByIdAndDelete(cart._id);
+
+    // Handle Payment if Razorpay is used
+    if (paymentMethod === "razorpay") {
+      const payment = new Payment({
+        orderId: order._id,
+        paymentMethod,
+        paymentStatus: "Pending",
+        amount: finalPrice,
+      });
+      await payment.save();
+
+      order.paymentId = payment._id;
+      await order.save();
+    }
+
+    if (paymentMethod === "cod") {
+      await Cart.findByIdAndDelete(cart._id);
+    }
 
     res.status(201).json({ message: "Order placed successfully", order });
   } catch (error) {
@@ -56,7 +77,10 @@ export const getUserOrders = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const orders = await Order.find({ userId }).sort({ createdAt: -1 });
+    const orders = await Order.find({ userId })
+      .populate("paymentId")
+      .sort({ createdAt: -1 });
+
     res.status(200).json({ orders });
   } catch (error) {
     res
@@ -65,7 +89,56 @@ export const getUserOrders = async (req, res) => {
   }
 };
 
-// Update order status (trigged by shipper)
+// Cancel an order
+export const cancelOrder = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { orderId } = req.body;
+
+    const order = await Order.findById(orderId).session(session);
+
+    if (!order) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    if (order.orderStatus === "Cancelled") {
+      await session.commitTransaction();
+      return res.status(400).json({ message: "Order is already cancelled" });
+    }
+
+    order.orderStatus = "Cancelled";
+    await order.save({ session });
+
+    if (order.paymentMethod === "razorpay" && order.paymentId) {
+      const refundResult = await processRefund(order.paymentId, session);
+      if (refundResult.success) {
+        order.isRefunded = true;
+        await order.save({ session });
+      } else {
+        await session.abortTransaction();
+        return res.status(500).json({ message: refundResult.error });
+      }
+    }
+
+    await session.commitTransaction();
+
+    await order.populate("paymentId");
+
+    res.status(200).json({ message: "Order cancelled successfully", order });
+  } catch (error) {
+    await session.abortTransaction();
+    res
+      .status(500)
+      .json({ message: "Failed to cancel order", error: error.message });
+  } finally {
+    session.endSession();
+  }
+};
+
+// Update order status (triggered by shipper)
 export const updateOrderStatus = async (req, res) => {
   try {
     const { orderId, status } = req.body;
@@ -87,27 +160,5 @@ export const updateOrderStatus = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to update order status", error: error.message });
-  }
-};
-
-// Update payment status (triggered by payment gateway webhook)
-export const updatePaymentStatus = async (req, res) => {
-  try {
-    const { orderId, status } = req.body;
-
-    const order = await Order.findById(orderId);
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    order.paymentStatus = status;
-
-    await order.save();
-    res.status(200).json({ message: "Payment status updated", order });
-  } catch (error) {
-    res.status(500).json({
-      message: "Failed to update payment status",
-      error: error.message,
-    });
   }
 };
