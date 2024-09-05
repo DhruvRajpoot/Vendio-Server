@@ -4,7 +4,6 @@ import dotenv from "dotenv";
 import cors from "cors";
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
-import { clientUrl } from "./config/baseurl.js";
 
 dotenv.config();
 
@@ -13,14 +12,13 @@ const port = process.env.PORT || 8080;
 
 // CORS configuration
 const corsOptions = {
-  origin: [clientUrl],
+  origin: [process.env.CLIENT_URL],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(cors(corsOptions));
-
 app.use(express.json());
 app.use(bodyParser.json({ extended: true }));
 app.use(bodyParser.urlencoded({ extended: true }));
