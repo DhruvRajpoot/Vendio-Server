@@ -7,3 +7,14 @@ cloudinary.config({
 });
 
 export default cloudinary;
+
+export const deleteImageOnCloudinary = async (img) => {
+  const publicId = img.split("/").slice(-2).join("/").split(".")[0];
+
+  try {
+    const result = await cloudinary.uploader.destroy(publicId);
+    console.log("Image deleted on cloudinary : ", result);
+  } catch (error) {
+    console.log("Error while deleting image on cloudinary : ", error);
+  }
+};
