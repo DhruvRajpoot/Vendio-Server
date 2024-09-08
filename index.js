@@ -29,6 +29,7 @@ connectdatabase();
 // Routes
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/user.js";
+import productRoutes from "./routes/product.js";
 import cartRoutes from "./routes/cart.js";
 import orderRoutes from "./routes/order.js";
 import wishlistRoutes from "./routes/wishlist.js";
@@ -37,6 +38,7 @@ import paymentRoutes from "./routes/payment.js";
 
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/product", productRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/order", orderRoutes);
 app.use("/api/wishlist", wishlistRoutes);

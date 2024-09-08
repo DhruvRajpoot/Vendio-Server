@@ -15,7 +15,7 @@ export const updateProfilePic = async (req, res) => {
 
       return res.status(200).json({
         message: "Profile pic updated successfully",
-        pic: user.profilePic,
+        user: user,
       });
     }
 
@@ -28,7 +28,7 @@ export const updateProfilePic = async (req, res) => {
 
     res.status(200).json({
       message: "Profile pic updated successfully",
-      pic: user.profilePic,
+      user: user,
     });
   } catch (error) {
     res.status(500).json({
