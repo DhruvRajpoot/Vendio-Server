@@ -1,5 +1,5 @@
 import Wishlist from "../database/models/wishlist.js";
-import { products } from "../database/products.js";
+import Product from "../database/models/product.js";
 
 // Add product to wishlist
 export const addProductToWishlist = async (req, res) => {
@@ -7,7 +7,7 @@ export const addProductToWishlist = async (req, res) => {
   const { productId } = req.body;
 
   try {
-    const product = products.find((p) => p.id === productId);
+    const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
