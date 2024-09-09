@@ -132,7 +132,7 @@ export const processRefund = async (paymentId, session) => {
     const payment = await Payment.findById(paymentId).session(session);
 
     if (!payment || payment.paymentStatus !== "Paid") {
-      return { error: "Payment not found or not eligible for refund" };
+      return { success: true };
     }
 
     await razorpayInstance.payments.refund(payment.razorpayPaymentId, {
