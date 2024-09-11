@@ -23,10 +23,10 @@ export const createOrder = async (req, res) => {
 
     const discountAmount =
       couponCode && couponCodes[couponCode]
-        ? cart.totalPrice * couponCodes[couponCode]
+        ? Math.floor(cart.totalPrice * couponCodes[couponCode])
         : 0;
 
-    const taxes = (cart.totalPrice - discountAmount) * taxRate;
+    const taxes = Math.floor((cart.totalPrice - discountAmount) * taxRate);
 
     const finalPrice =
       cart.totalPrice - discountAmount + deliveryCharges + taxes;

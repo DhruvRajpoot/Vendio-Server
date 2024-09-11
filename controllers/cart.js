@@ -24,16 +24,13 @@ export const addToCart = async (req, res) => {
         // Update the quantity and total price of the existing item
         cart.items[existingItemIndex].quantity += quantity;
         cart.items[existingItemIndex].totalPrice =
-          (product.price - (product.discount * product.price) / 100) *
-          cart.items[existingItemIndex].quantity;
+          product.discountedPrice * cart.items[existingItemIndex].quantity;
       } else {
         // Add new item to cart
         cart.items.push({
           product: productId,
           quantity,
-          totalPrice:
-            (product.price - (product.discount * product.price) / 100) *
-            quantity,
+          totalPrice: product.discountedPrice * quantity,
         });
       }
     } else {
@@ -44,9 +41,7 @@ export const addToCart = async (req, res) => {
           {
             product: productId,
             quantity,
-            totalPrice:
-              (product.price - (product.discount * product.price) / 100) *
-              quantity,
+            totalPrice: product.discountedPrice * quantity,
           },
         ],
       });
@@ -138,8 +133,7 @@ export const updateCart = async (req, res) => {
       }
 
       cart.items[itemIndex].quantity = quantity;
-      cart.items[itemIndex].totalPrice =
-        (product.price - (product.discount * product.price) / 100) * quantity;
+      cart.items[itemIndex].totalPrice = product.discountedPrice * quantity;
 
       await cart.save();
       return res.status(200).json({ message: "Cart item updated", cart });
@@ -203,8 +197,7 @@ export const addBulkToCart = async (req, res) => {
         }
 
         cart.items[existingItemIndex].totalPrice =
-          (product.price - (product.discount * product.price) / 100) *
-          cart.items[existingItemIndex].quantity;
+          product.discountedPrice * cart.items[existingItemIndex].quantity;
       } else {
         const product = await Product.findById(productId);
 
@@ -215,9 +208,7 @@ export const addBulkToCart = async (req, res) => {
         cart.items.push({
           product: productId,
           quantity,
-          totalPrice:
-            (product.price - (product.discount * product.price) / 100) *
-            quantity,
+          totalPrice: product.discountedPrice * quantity,
         });
       }
     }
