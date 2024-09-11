@@ -16,16 +16,17 @@ export const createOrder = async (req, res) => {
     const { shippingAddress, paymentMethod, couponCode } = req.body;
 
     const cart = await Cart.findOne({ userId });
+
     if (!cart || cart.items.length === 0) {
       return res.status(400).json({ message: "Cart is empty or not found." });
     }
 
     const discountAmount =
       couponCode && couponCodes[couponCode]
-        ? cart.totalPrice * couponCodes[couponCode]
+        ? Math.floor(cart.totalPrice * couponCodes[couponCode])
         : 0;
 
-    const taxes = (cart.totalPrice - discountAmount) * taxRate;
+    const taxes = Math.floor((cart.totalPrice - discountAmount) * taxRate);
 
     const finalPrice =
       cart.totalPrice - discountAmount + deliveryCharges + taxes;
@@ -46,7 +47,7 @@ export const createOrder = async (req, res) => {
 
     await order.save();
 
-    // Handle Payment if Razorpay is used
+    // If payment method is razorpay, create a payment document
     if (paymentMethod === "razorpay") {
       const payment = new Payment({
         orderId: order._id,
@@ -64,6 +65,8 @@ export const createOrder = async (req, res) => {
       await Cart.findByIdAndDelete(cart._id);
     }
 
+    await order.populate("items.product");
+
     res.status(201).json({ message: "Order placed successfully", order });
   } catch (error) {
     res
@@ -72,12 +75,13 @@ export const createOrder = async (req, res) => {
   }
 };
 
-// Get all orders for a user
+// Get all orders for the logged in user
 export const getUserOrders = async (req, res) => {
   try {
     const userId = req.user._id;
 
     const orders = await Order.find({ userId })
+      .populate("items.product")
       .populate("paymentId")
       .sort({ createdAt: -1 });
 
@@ -105,13 +109,14 @@ export const cancelOrder = async (req, res) => {
     }
 
     if (order.orderStatus === "Cancelled") {
-      await session.commitTransaction();
+      await session.abortTransaction();
       return res.status(400).json({ message: "Order is already cancelled" });
     }
 
     order.orderStatus = "Cancelled";
     await order.save({ session });
 
+    // Process refund if payment method is Razorpay and refund is needed
     if (order.paymentMethod === "razorpay" && order.paymentId) {
       const refundResult = await processRefund(order.paymentId, session);
       if (refundResult.success) {
@@ -126,10 +131,16 @@ export const cancelOrder = async (req, res) => {
     await session.commitTransaction();
 
     await order.populate("paymentId");
+    await order.populate("items.product");
 
     res.status(200).json({ message: "Order cancelled successfully", order });
   } catch (error) {
-    await session.abortTransaction();
+    if (
+      session.transaction.state === "STARTING" ||
+      session.transaction.state === "TRANSACTION_IN_PROGRESS"
+    ) {
+      await session.abortTransaction();
+    }
     res
       .status(500)
       .json({ message: "Failed to cancel order", error: error.message });

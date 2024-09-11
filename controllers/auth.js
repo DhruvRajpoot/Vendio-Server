@@ -293,17 +293,12 @@ export const getAccessToken = async (req, res) => {
           return res.status(401).json({ message: "Invalid refresh token" });
         }
 
-        const { _id, email, firstName, lastName, profilePic, isVerified } =
-          decoded;
+        const { _id, email } = decoded;
 
         const accessToken = jwt.sign(
           {
             _id,
             email,
-            firstName,
-            lastName,
-            profilePic,
-            isVerified,
           },
           process.env.JWT_SECRET,
           {

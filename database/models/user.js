@@ -65,15 +65,12 @@ userSchema.methods.generateAuthToken = async function () {
   const payload = {
     _id: user._id.toString(),
     email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    profilePic: user.profilePic,
-    isVerified: user.isVerified,
   };
   try {
     const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "2h",
     });
+
     const refreshToken = jwt.sign(
       payload,
       process.env.REFRESHTOKEN_SECRET_KEY,
@@ -81,6 +78,7 @@ userSchema.methods.generateAuthToken = async function () {
         expiresIn: "7d",
       }
     );
+
     return { accessToken, refreshToken };
   } catch (error) {
     throw new Error("Error generating tokens");
