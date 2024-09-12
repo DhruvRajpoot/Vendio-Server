@@ -1,5 +1,6 @@
 import { deleteImageOnCloudinary } from "../utils/cloudinary.js";
 import User from "../database/models/user.js";
+import cloudinary from "../utils/cloudinary.js";
 
 export const getUserDetails = async (req, res) => {
   try {
@@ -27,45 +28,54 @@ export const getUserDetails = async (req, res) => {
 
 export const updateProfilePic = async (req, res) => {
   try {
+    const file = req.file;
     const userId = req.user._id;
 
     const user = await User.findById(userId);
-
     if (!user) {
-      return res.status(404).json({ message: "User not found " });
+      return res.status(404).json({ message: "User not found" });
     }
 
-    const { pic, oldPic } = req.body;
+    if (file) {
+      cloudinary.uploader
+        .upload_stream(
+          {
+            resource_type: "image",
+            folder: "profile_pics",
+            upload_preset: "low_res_image_preset",
+          },
+          async (error, result) => {
+            if (error) {
+              return res.status(500).json({ message: "Upload failed", error });
+            }
 
-    if (!pic) {
-      user.profilePic = null;
-      await user.save();
+            try {
+              if (user.profilePic) {
+                deleteImageOnCloudinary(user.profilePic);
+              }
 
-      if (oldPic) {
-        deleteImageOnCloudinary(oldPic);
+              user.profilePic = result.secure_url;
+              await user.save();
+
+              res.status(200).json({ message: "Profile pic updated", user });
+            } catch (err) {
+              return res
+                .status(500)
+                .json({ message: "Error updating user", error: err });
+            }
+          }
+        )
+        .end(file.buffer);
+    } else {
+      if (user.profilePic) {
+        deleteImageOnCloudinary(user.profilePic);
+        user.profilePic = "";
+        await user.save();
       }
 
-      return res.status(200).json({
-        message: "Profile pic updated successfully",
-        user: user,
-      });
+      res.status(200).json({ message: "Profile pic removed", user });
     }
-
-    user.profilePic = pic;
-    await user.save();
-
-    if (oldPic) {
-      deleteImageOnCloudinary(oldPic);
-    }
-
-    res.status(200).json({
-      message: "Profile pic updated successfully",
-      user: user,
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: error,
-      message: "Error while updating profile pic",
-    });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating profile pic", error: err });
   }
 };

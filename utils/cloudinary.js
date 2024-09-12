@@ -1,4 +1,5 @@
 import { v2 as cloudinary } from "cloudinary";
+import multer from "multer";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -8,13 +9,17 @@ cloudinary.config({
 
 export default cloudinary;
 
-export const deleteImageOnCloudinary = async (img) => {
-  const publicId = img.split("/").slice(-2).join("/").split(".")[0];
+const storage = multer.memoryStorage();
+export const upload = multer({ storage });
 
+export const deleteImageOnCloudinary = async (imgUrl) => {
   try {
+    const publicId = imgUrl.split("/").slice(-2).join("/").split(".")[0];
     const result = await cloudinary.uploader.destroy(publicId);
-    console.log("Image deleted on cloudinary : ", result);
+    console.log("Image deleted from Cloudinary:", result);
+    return result;
   } catch (error) {
-    console.log("Error while deleting image on cloudinary : ", error);
+    console.error("Error deleting image on Cloudinary:", error);
+    throw new Error("Failed to delete image on Cloudinary");
   }
 };
