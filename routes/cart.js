@@ -5,7 +5,7 @@ import {
   updateCart,
   removeFromCart,
   clearCart,
-  addBulkToCart,
+  syncCart,
 } from "../controllers/cart.js";
 import checkuser from "../middleware/checkuser.js";
 
@@ -21,6 +21,6 @@ router.delete("/:productId", checkuser, removeFromCart);
 
 router.delete("/", checkuser, clearCart);
 
-router.post("/bulk", checkuser, addBulkToCart);
+router.post("/sync", checkuser, syncCart);
 
 export default router;

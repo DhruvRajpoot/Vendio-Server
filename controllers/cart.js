@@ -171,8 +171,8 @@ export const clearCart = async (req, res) => {
   }
 };
 
-// Add multiple items to cart
-export const addBulkToCart = async (req, res) => {
+// Sync user's cart with local storage cart
+export const syncCart = async (req, res) => {
   const userId = req.user._id;
   const items = req.body.items;
 
@@ -183,7 +183,9 @@ export const addBulkToCart = async (req, res) => {
       cart = new Cart({ userId, items: [] });
     }
 
-    for (const { productId, quantity } of items) {
+    for (const { product, quantity } of items) {
+      const productId = product._id;
+
       const existingItemIndex = cart.items.findIndex(
         (item) => item.product.toString() === productId
       );
@@ -215,7 +217,7 @@ export const addBulkToCart = async (req, res) => {
 
     await cart.save();
 
-    const populatedCart = await cart.populate("items.product").execPopulate();
+    const populatedCart = await cart.populate("items.product");
 
     res
       .status(200)
@@ -223,6 +225,6 @@ export const addBulkToCart = async (req, res) => {
   } catch (error) {
     res
       .status(500)
-      .json({ message: "Error updating cart", error: error.message });
+      .json({ message: "Error syncing cart", error: error.message });
   }
 };
