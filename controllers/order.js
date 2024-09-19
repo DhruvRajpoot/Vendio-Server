@@ -8,6 +8,8 @@ import {
 } from "../constants/constants.js";
 import { processRefund } from "./payment.js";
 import mongoose from "mongoose";
+import orderConfirmation from "../templates/orderConfirmation.js";
+import sendEmail from "../utils/sendEmail.js";
 
 // Create a new order
 export const createOrder = async (req, res) => {
@@ -61,11 +63,16 @@ export const createOrder = async (req, res) => {
       await order.save();
     }
 
+    await order.populate("items.product");
+
     if (paymentMethod === "cod") {
       await Cart.findByIdAndDelete(cart._id);
-    }
 
-    await order.populate("items.product");
+      // Send order confirmation email
+      const emailSubject = `📦 Order Confirmation - Order #${order._id} from Vendio`;
+      const emailMessage = orderConfirmation(order);
+      sendEmail(req.user.email, emailSubject, emailMessage);
+    }
 
     res.status(201).json({ message: "Order placed successfully", order });
   } catch (error) {

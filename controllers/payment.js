@@ -4,6 +4,8 @@ import Payment from "../database/models/payment.js";
 import Order from "../database/models/order.js";
 import Cart from "../database/models/cart.js";
 import mongoose from "mongoose";
+import orderConfirmation from "../templates/orderConfirmation.js";
+import sendEmail from "../utils/sendEmail.js";
 
 // Initialize Razorpay instance
 const razorpayInstance = new Razorpay({
@@ -112,6 +114,14 @@ export const verifyPayment = async (req, res) => {
       if (cart) {
         await Cart.findByIdAndDelete(cart._id).session(session);
       }
+
+      // Send order confirmation email
+      await order.populate("items.product");
+      await order.populate("paymentId");
+
+      const emailSubject = `📦 Order Confirmation - Order #${order._id} from Vendio`;
+      const emailMessage = orderConfirmation(order);
+      sendEmail(req.user.email, emailSubject, emailMessage);
     }
 
     await session.commitTransaction();
